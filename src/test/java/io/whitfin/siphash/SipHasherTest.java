@@ -31,6 +31,13 @@ public class SipHasherTest {
         0x6ca4ecb15c5f91e1L, 0x9f626da15c9625f3L, 0xe51b38608ef25f57L, 0x958a324ceb064572L
     };
 
+    // test vectors via https://github.com/veorq/SipHash/blob/master/vectors.h
+    private static final long[][] EXPECTED_128 = new long[][]{
+            new long[]{0xe6a825ba047f81a3L, 0x930255c71472f66dL},
+            new long[]{0x44af996bd8c187daL, 0x45fc229b11597634L}
+            // TODO add all test vectors
+    };
+
     /**
      * Tests constructor usage to suppress Jacoco.
      */
@@ -48,6 +55,19 @@ public class SipHasherTest {
             @Override
             public long hash(byte[] key, byte[] data) {
                 return SipHasher.hash(key, data);
+            }
+        });
+    }
+
+    /**
+     * Tests all vectors using the 0A hash implementation.
+     */
+    @Test
+    public void testVectors128ForZeroAllocHash() {
+        testVectors128(new Hasher128() {
+            @Override
+            public long[] hash128(byte[] key, byte[] data) {
+                return SipHasher.hash128(key, data);
             }
         });
     }
@@ -105,6 +125,34 @@ public class SipHasherTest {
     }
 
     /**
+     * Vector test implementation to allow passing a hasher
+     * to avoid vector boilerplate.
+     *
+     * @param hasher
+     *      the hasher implementation used to generate a hash.
+     */
+    void testVectors128(Hasher128 hasher) {
+        byte[] key = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            key[i] = (byte) i;
+        }
+
+        for (int i = 0; i < EXPECTED_128.length; i++) {
+            byte[] data = new byte[i];
+            for (int j = 0; j < i; j++) {
+                data[j] = (byte) j;
+            }
+
+            long expectedLower = EXPECTED_128[i][0];
+            long expectedUpper = EXPECTED_128[i][1];
+            long[] actual = hasher.hash128(key, data);
+
+            Assert.assertEquals(actual[0], expectedLower);
+            Assert.assertEquals(actual[1], expectedUpper);
+        }
+    }
+
+    /**
      * Simple interface for use with {@link #testVectors(Hasher)}.
      */
     interface Hasher {
@@ -120,5 +168,24 @@ public class SipHasherTest {
          *      a long representation of a hash.
          */
         long hash(byte[] key, byte[] data);
+    }
+
+    /**
+     * Simple interface for use with {@link #testVectors128(Hasher128)}.
+     */
+    interface Hasher128 {
+
+        /**
+         * Given a key and input data, return a hash.
+         *
+         * @param key
+         *      the key to seed the hash with.
+         * @param data
+         *      the data being hashed.
+         * @return
+         *      two longs as representation of the hash.
+         */
+        long[] hash128(byte[] key, byte[] data);
+
     }
 }

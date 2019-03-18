@@ -27,4 +27,17 @@ public class SipHasherContainerTest extends SipHasherTest {
             }
         });
     }
+
+    /**
+     * Tests all vectors using the container hash implementation.
+     */
+    @Test
+    public void testVectors128ForContainerHash() {
+        testVectors128(new Hasher128() {
+            @Override
+            public long[] hash128(byte[] key, byte[] data) {
+                return SipHasher.container(key).hash128(data);
+            }
+        });
+    }
 }
