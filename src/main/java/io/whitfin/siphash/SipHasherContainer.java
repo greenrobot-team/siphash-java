@@ -60,7 +60,19 @@ public final class SipHasherContainer {
      *      a long value as the output of the hash.
      */
     public final long hash(byte[] data) {
-        return hash(data, DEFAULT_C, DEFAULT_D);
+        return hash(data, DEFAULT_C, DEFAULT_D, 8)[0];
+    }
+
+    /**
+     * Hashes input data using the preconfigured state.
+     *
+     * @param data
+     *      the data to hash and digest.
+     * @return
+     *      two long values as the output of the hash.
+     */
+    public final long[] hash128(byte[] data) {
+        return hash(data, DEFAULT_C, DEFAULT_D, 16);
     }
 
     /**
@@ -75,14 +87,18 @@ public final class SipHasherContainer {
      * @return
      *      a long value as the output of the hash.
      */
-    public final long hash(byte[] data, int c, int d) {
+    public final long[] hash(byte[] data, int c, int d, int outlen) {
+        if (outlen != 8 && outlen != 16) {
+            throw new IllegalArgumentException("outlen must be 8 or 16");
+        }
         return SipHasher.hash(
             c, d,
             this.v0,
             this.v1,
             this.v2,
             this.v3,
-            data
+            data,
+            new long[outlen == 16 ? 2 : 1]
         );
     }
 }

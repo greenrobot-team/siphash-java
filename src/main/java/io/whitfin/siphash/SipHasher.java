@@ -82,7 +82,23 @@ public final class SipHasher {
      *      a long value as the output of the hash.
      */
     public static long hash(byte[] key, byte[] data) {
-        return hash(key, data, DEFAULT_C, DEFAULT_D);
+        return hash(key, data, DEFAULT_C, DEFAULT_D, 8)[0];
+    }
+
+    /**
+     * Hashes a data input for a given key.
+     *
+     * This will used the default values for C and D rounds.
+     *
+     * @param key
+     *      the key to seed the hash with.
+     * @param data
+     *      the input data to hash.
+     * @return
+     *      two long values as the output of the hash.
+     */
+    public static long[] hash128(byte[] key, byte[] data) {
+        return hash(key, data, DEFAULT_C, DEFAULT_D, 16);
     }
 
     /**
@@ -100,7 +116,10 @@ public final class SipHasher {
      * @return
      *      a long value as the output of the hash.
      */
-    public static long hash(byte[] key, byte[] data, int c, int d) {
+    public static long[] hash(byte[] key, byte[] data, int c, int d, int outlen) {
+        if (outlen != 8 && outlen != 16) {
+            throw new IllegalArgumentException("outlen must be 8 or 16");
+        }
         if (key.length != 16) {
             throw new IllegalArgumentException("Key must be exactly 16 bytes!");
         }
@@ -114,7 +133,8 @@ public final class SipHasher {
             INITIAL_V1 ^ k1,
             INITIAL_V2 ^ k0,
             INITIAL_V3 ^ k1,
-            data
+            data,
+            new long[outlen == 16 ? 2 : 1]
         );
     }
 
@@ -195,6 +215,17 @@ public final class SipHasher {
     }
 
     /**
+     * Converts a long to a chunk of 8 bytes in little endian.
+     *
+     * Accepts an offset to determine where the chunk should begin.
+     */
+    public static void longToBytes(long value, byte[] out, int offset) {
+        for (int i = 0; i < 8; i++) {
+            out[i + offset] = (byte) (value >> i * 8);
+        }
+    }
+
+    /**
      * Internal 0A hashing implementation.
      *
      * Requires initial state being manually provided (to avoid allocation). The
@@ -218,11 +249,15 @@ public final class SipHasher {
      * @return
      *      a long value as the output of the hash.
      */
-    static long hash(int c, int d, long v0, long v1, long v2, long v3, byte[] data) {
+    static long[] hash(int c, int d, long v0, long v1, long v2, long v3, byte[] data, long[] out) {
         long m;
         int last = data.length / 8 * 8;
         int i = 0;
         int r;
+
+        if (out.length == 2) {
+            v1 ^= 0xee;
+        }
 
         while (i < last) {
             m = data[i++] & 0xffL;
@@ -282,7 +317,11 @@ public final class SipHasher {
         }
         v0 ^= m;
 
-        v2 ^= 0xff;
+        if (out.length == 2) {
+            v2 ^= 0xee;
+        } else {
+            v2 ^= 0xff;
+        }
         for (r = 0; r < d; r++) {
             v0 += v1;
             v2 += v3;
@@ -303,7 +342,37 @@ public final class SipHasher {
             v2 = rotateLeft(v2, 32);
         }
 
-        return v0 ^ v1 ^ v2 ^ v3;
+        out[0] = v0 ^ v1 ^ v2 ^ v3;
+
+        if (out.length == 1) {
+            return out;
+        }
+
+        v1 ^= 0xdd;
+
+        for (r = 0; r < d; r++) {
+            v0 += v1;
+            v2 += v3;
+            v1 = rotateLeft(v1, 13);
+            v3 = rotateLeft(v3, 16);
+
+            v1 ^= v0;
+            v3 ^= v2;
+            v0 = rotateLeft(v0, 32);
+
+            v2 += v1;
+            v0 += v3;
+            v1 = rotateLeft(v1, 17);
+            v3 = rotateLeft(v3, 21);
+
+            v1 ^= v2;
+            v3 ^= v0;
+            v2 = rotateLeft(v2, 32);
+        }
+
+        out[1] = v0 ^ v1 ^ v2 ^ v3;
+
+        return out;
     }
 
     /**
